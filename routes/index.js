@@ -4,23 +4,13 @@ const router = express.Router();
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
 
-router.get('/',  async (req, res, next) => {
-  try {
-    let result = await db.getUsers();
-    res.json(result);
-  } catch(e) {
-    console.log(e);
-    res.sendStatus(500);
-  }
-});
-
 router.post('/signup', async (req, res) => {
   try {
     const data = req.body;
 
     let result = await db.signup(data.id, data.password);
 
-    res.status(result.status).json({message: result.message});
+    res.status(result.status).json({message: result.message, token: result.token, refreshToken: result.refreshToken});
   } catch(e) {
     console.log(e);
     res.sendStatus(500);
@@ -45,22 +35,16 @@ router.post('/signin', async (req, res) => {
   }
 });
 
-// router.post('/signin/new_token', async (req, res) => {
-//   try {
-//     const data = req.body;
+router.post('/signin/new_token', async (req, res) => {
+  try {
+    let result = await db.refreshTokens(req, res);
 
-//     let result = await db.signin(data.id, data.password);
-
-//     if (result.status === 200) {
-//       res.status(result.status).json({message: result.message, token: result.token, refreshToken: result.refreshToken});
-//     } else {
-//       res.status(result.status).json({message: result.message});
-//     }
-//   } catch(e) {
-//     console.log(e);
-//     res.status(500);
-//   }
-// });
+    res.status(result.status).json({message: result.message, token: `Bearer ${result.token}`, refreshToken: result.refreshToken});
+  } catch(e) {
+    console.log(e);
+    res.status(500);
+  }
+});
 
 router.get('/info', passport.authenticate('jwt', {session: false}), async (req, res) => {
   try {
@@ -76,6 +60,17 @@ router.get('/info', passport.authenticate('jwt', {session: false}), async (req, 
     }
   } catch(e) {
     console.log(e);
+  }
+});
+
+router.get('/logout', passport.authenticate('jwt', {session: false}), async (req, res) => {
+  try {
+    let result = await db.logout(req);
+
+    res.status(200).json(result.message);
+  } catch(e) {
+    console.log(e);
+    res.status(500);
   }
 });
 

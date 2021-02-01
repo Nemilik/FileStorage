@@ -7,9 +7,22 @@ const upload = require('../middleware/upload');
 router.post('/upload', upload.single('file'), async (req, res) =>{
   try {
     if (req.file) {
-      console.log(req.file);
+      result = await db.uploadFile(req.file);
+
+      res.status(result.status).json({message: result.message});
+    } else {
+      res.status(400).json({message: "Bad Request"});
     }
-    res.status(200).json({message: 'Done'});
+  } catch(e) {
+    console.log(e);
+  }
+});
+
+router.get('/list', async (req, res) =>{
+  try {
+    result = await db.fileList();
+
+    res.status(200).json(result);
   } catch(e) {
     console.log(e);
   }
