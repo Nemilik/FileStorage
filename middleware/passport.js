@@ -15,8 +15,9 @@ module.exports = passport => {
     new JwtStrategy(opts, async (payload, done) => {
       try {
         const user = await db.getUser(payload.id);
+        const isToken = await db.getToken(payload.id);
         
-        if (user) {
+        if (user && isToken) {
           done(null, user);
         } else {
           done(null, false);

@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const shortid = require('shortid');
 const path = require('path');
+const fs = require('fs');
 
 const { generateBearerToken, generateRefreshToken } = require('../helpers/auth');
 
@@ -29,20 +30,21 @@ let filesdb = {};
 
 // CREATE TABLE `db`.`files` (
 //   `id` VARCHAR(50) NOT NULL,
-//   `name` VARCHAR(150) NULL,
+//   `name` VARCHAR(150) CHARACTER SET 'utf8' NULL,
 //   `extname` VARCHAR(50) NULL,
 //   `mimetype` VARCHAR(150) NULL,
 //   `size` INT NULL,
 //   `uploadDate` DATETIME NULL,
+//   `path` MEDIUMTEXT CHARACTER SET 'utf8' NULL
 //   PRIMARY KEY (`id`),
 //   UNIQUE INDEX `id_UNIQUE` (`id` ASC));
 
 // CREATE TABLE `db`.`tokens` (
 //   `userId` VARCHAR(150) NOT NULL,
-//   `tokenId` VARCHAR(150) NULL,
+//   `token` VARCHAR(300) NULL,
+//   `refreshTokenId` VARCHAR(100) NULL
 //   PRIMARY KEY (`userId`),
 //   UNIQUE INDEX `userId_UNIQUE` (`userId` ASC));
-
 
 
 filesdb.getUsers = () => {
@@ -123,6 +125,25 @@ filesdb.signin = (userId, password) => {
   });
 }
 
+filesdb.getToken = (userId) => {
+  return new Promise((resolve, reject) => {
+    try {
+      pool.query('SELECT * FROM tokens WHERE userId = ?', userId, (err, res) => {
+        if (err) {
+          return reject(err);
+        }
+
+        if (res[0]) {
+          return resolve(true);
+        }
+        return resolve(false);
+      });
+    } catch(e) {
+      console.log(e);
+    }
+  });
+}
+
 filesdb.refreshTokens = (req, res) => {
   const { refreshToken } = req.body;
   let payload;
@@ -142,7 +163,7 @@ filesdb.refreshTokens = (req, res) => {
   }
 
   return new Promise((resolve, reject) => {
-    const query = 'SELECT * FROM tokens WHERE tokenId = ?';
+    const query = 'SELECT * FROM tokens WHERE refreshTokenId = ?';
     const value = payload.id;
 
     pool.query(query, value, (err, res) => {
@@ -151,8 +172,9 @@ filesdb.refreshTokens = (req, res) => {
       }
       console.log(res)
       if (res[0]) {
-        console.log(res[0])
-        return resolve(updateTokens(res[0].userId));
+        const tokens = updateTokens(res[0].userId)
+
+        return resolve({status: 200, token: tokens.token, refreshToken: tokens.refreshToken, message: "updated"});
       } else {
         return resolve({status: 400, message: 'Invalid token'});
       }
@@ -160,13 +182,29 @@ filesdb.refreshTokens = (req, res) => {
   });
 }
 
+filesdb.logout = (userId) => {
+  return new Promise((resolve, reject) => {
+    try {
+      pool.query('DELETE FROM tokens WHERE userId = ?', userId, (err, res) => {
+        if (err) {
+          return reject(err);
+        }
+
+        return resolve({status: 202, message: 'Accepted'});
+      });
+    } catch(e) {
+      console.log(e);
+    }
+  });
+}
+
 filesdb.uploadFile = (file) => {
   return new Promise((resolve, reject) => {
     try {
       if (file) {
-        const sql = "INSERT INTO files (id, name, extname, mimetype, size, uploadDate) VALUES(?, ?, ?, ?, ?, ?)";
+        const sql = "INSERT INTO files (id, name, extname, mimetype, size, uploadDate, path) VALUES(?, ?, ?, ?, ?, ?, ?)";
 
-        const value = [shortid.generate(), file.originalname, path.extname(file.originalname), file.mimetype, file.size, new Date()]
+        const value = [shortid.generate(), file.originalname, path.extname(file.originalname), file.mimetype, file.size, new Date(), file.path]
 
         pool.query(sql, value, (err, res) => {
           if (err) {
@@ -184,10 +222,11 @@ filesdb.uploadFile = (file) => {
   });
 }
 
-filesdb.fileList = () => {
+filesdb.fileList = (listSize = 10, page = 1) => {
   return new Promise((resolve, reject) => {
     try {
-      pool.query('SELECT * FROM files', (err, res) => {
+      const bias = (Number(page) - 1) * Number(listSize)
+      pool.query(`SELECT * FROM files LIMIT ${bias}, ${listSize}`, (err, res) => {
         if (err) {
           return reject(err);
         }
@@ -200,20 +239,118 @@ filesdb.fileList = () => {
   });
 }
 
-filesdb.logout = (req) => {
-  const bearerToken = req.headers.authorization;
-  const token = bearerToken.split(' ');
+filesdb.findFile = (id) => {
+  return new Promise((resolve, reject) => {
+    try {
+      pool.query('SELECT * FROM files WHERE id = ?', id, (err, res) => {
+        if (err) {
+          return reject(err);
+        }
 
-  const decoded = jwt.verify(token[1], process.env.JWT);
-
-  const result = updateTokens(decoded.id);
-
-  if (result) {
-    return {message: 'Done'}
-  }
+        if (res[0]) {
+          return resolve({status: 200, data: res[0]});
+        } else {
+          return resolve({status: 204, message: 'No Content'})
+        }
+      });
+    } catch(e) {
+      console.log(e);
+    }
+  });
 }
 
-const replaceDbRefreshToken = (userId, tokenId) => {
+filesdb.deleteFile = (id) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const path = await filesdb.getPathFile(id);
+        
+      if (path) {
+        fs.unlink(path, (e) => {
+          if (e) {
+            console.log(e);
+            return;
+          }
+        });
+        
+        pool.query('DELETE FROM files WHERE id = ?', id, (err, res) => {
+          if (err) {
+            return reject(err);
+          }
+          
+          resolve({status: 200, message: 'Deleted'});
+        });
+      } else {
+        return resolve({status: 204, message: 'No Content'})
+      }
+    } catch(e) {
+      console.log(e);
+    }
+  });
+}
+
+filesdb.downloadFile = (id) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      path = await filesdb.getPathFile(id);
+        
+      if (path) {
+        
+      } else {
+        return resolve({status: 204, message: 'No Content'})
+      }
+    } catch(e) {
+      console.log(e);
+    }
+  });
+}
+
+filesdb.getPathFile = (id) => { 
+  return new Promise((resolve, reject) => {
+    try {
+      pool.query('SELECT * FROM files WHERE id = ?', id, (err, res) => {
+        if (err) {
+          return reject(err);
+        }
+
+        if (res[0]) {
+          return resolve(res[0].path);
+        } else {
+          return resolve(false);
+        }
+      });
+    } catch(e) {
+      console.log(e);
+    }
+  });  
+}
+
+filesdb.updateFile = (id, _path, file) => { 
+  return new Promise((resolve, reject) => {
+    try {
+      fs.unlink(_path, (e) => {
+        if (e) {
+          console.log(e);
+          return;
+        }
+      });
+
+      const query = 'UPDATE files SET name = ?, extname = ?, mimetype = ?, size = ?, uploadDate = ?, path = ? WHERE id = ?';
+      
+      const value = [file.originalname, path.extname(file.originalname), file.mimetype, file.size, new Date(), file.path, id]
+      pool.query(query, value, (err, res) => {
+        if (err) {
+          reject(err);
+        }
+
+        resolve({status: 202, message: 'Updated'});
+      });
+    } catch(e) {
+      console.log(e);
+    }
+  });  
+}
+
+const replaceDbRefreshToken = (userId, bearerToken, refreshTokenId) => {
   token = new Promise((resolve, reject) => {
     const query = 'SELECT * FROM tokens WHERE userId = ?';
     const value = userId;
@@ -228,8 +365,8 @@ const replaceDbRefreshToken = (userId, tokenId) => {
 
   return new Promise((resolve, reject) => {
     token.then(async (result) => {
-      const query = 'INSERT INTO tokens (userId, tokenId) VALUES(?, ?)';
-      const value = [userId, tokenId];
+      const query = 'INSERT INTO tokens (userId, token, refreshTokenId) VALUES(?, ?, ?)';
+      const value = [userId, bearerToken, refreshTokenId];
 
       if (result[0]) {
         pool.query('DELETE FROM tokens WHERE userId = ?', userId, (e, r) => {
@@ -262,7 +399,7 @@ const updateTokens = (userId) => {
   const token = generateBearerToken(userId);
   const refreshToken = generateRefreshToken();
 
-  replaceDbRefreshToken(userId, refreshToken.id);
+  replaceDbRefreshToken(userId, token, refreshToken.id);
 
   return {
     token,

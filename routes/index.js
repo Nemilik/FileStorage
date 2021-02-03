@@ -35,7 +35,7 @@ router.post('/signin', async (req, res) => {
   }
 });
 
-router.post('/signin/new_token', async (req, res) => {
+router.post('/signin/new_token', passport.authenticate('jwt', {session: false}), async (req, res) => {
   try {
     let result = await db.refreshTokens(req, res);
 
@@ -65,9 +65,14 @@ router.get('/info', passport.authenticate('jwt', {session: false}), async (req, 
 
 router.get('/logout', passport.authenticate('jwt', {session: false}), async (req, res) => {
   try {
-    let result = await db.logout(req);
+    const bearerToken = req.headers.authorization;
+    const token = bearerToken.split(' ');
 
-    res.status(200).json(result.message);
+    const decoded = jwt.verify(token[1], process.env.JWT);
+
+    const result = await db.logout(decoded.id);
+
+    res.status(result.status).json({message: result.message});
   } catch(e) {
     console.log(e);
     res.status(500);
