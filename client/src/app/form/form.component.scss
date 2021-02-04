@@ -1,0 +1,9 @@
+.form-inline {
+  .btn {
+    width: 155px;
+    &:first-child {
+      margin-right: 7px;
+    }
+    font-size: 18px;
+  }
+}
