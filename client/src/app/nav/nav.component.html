@@ -4,10 +4,10 @@
       <a class="navbar-brand" [routerLink]="['/']">Delivery</a>
       <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
         <div class="navbar-nav">
-          <a class="nav-item nav-link active" href="#">Роллы</a>
-          <a class="nav-item nav-link" href="#">Пицца</a>
-          <a class="nav-item nav-link" href="#">Шаурма</a>
-          <a class="nav-item nav-link" href="#">Сеты</a>
+          <a class="nav-item nav-link" [routerLink]="['/rolls']" routerLinkActive="active" href="#">Роллы</a>
+          <a class="nav-item nav-link" [routerLink]="['/pizza']" routerLinkActive="active" href="#">Пицца</a>
+          <a class="nav-item nav-link" [routerLink]="['/shawarma']" routerLinkActive="active" href="#">Шаурма</a>
+          <a class="nav-item nav-link" [routerLink]="['/sets']" routerLinkActive="active" href="#">Сеты</a>
         </div>
       </div>
       <app-form></app-form>
