@@ -1,8 +1,12 @@
-.form-control {
-  font-size: 18px !important;
-  padding: .500rem 1rem !important;
-  height: calc(2rem + 1rem + 2px) !important;
+body {
+  background-color: #EFE4E4;
+  .form-control {
+    font-size: 18px !important;
+    padding: .500rem 1rem !important;
+    height: calc(2rem + 1rem + 2px) !important;
+  }
 }
+
 // .alert-danger {
 //   background-color: #fefefe !important;
 // }
